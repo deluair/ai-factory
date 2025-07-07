@@ -10,6 +10,22 @@ def create_sample_neoclouds() -> List[NeocloudProvider]:
     """Create sample neocloud providers with realistic data."""
     
     # GPU specifications based on real market data
+    b100_spec = GPUSpec(
+        model="NVIDIA B100",
+        memory_gb=192,
+        compute_units=24000, # Placeholder, actual core counts are complex
+        power_watts=700,
+        cost_usd=32500
+    )
+
+    gb200_spec = GPUSpec(
+        model="NVIDIA GB200 Superchip",
+        memory_gb=384, # 2x B200 GPUs
+        compute_units=48000, # Placeholder
+        power_watts=1200,
+        cost_usd=65000
+    )
+    
     h100_spec = GPUSpec(
         model="NVIDIA H100",
         memory_gb=80,
@@ -20,10 +36,10 @@ def create_sample_neoclouds() -> List[NeocloudProvider]:
     
     a100_spec = GPUSpec(
         model="NVIDIA A100",
-        memory_gb=40,
+        memory_gb=80, # 80GB is more common now
         compute_units=6912,
         power_watts=400,
-        cost_usd=15000
+        cost_usd=12000 # Price has come down
     )
     
     v100_spec = GPUSpec(
@@ -68,52 +84,73 @@ def create_sample_neoclouds() -> List[NeocloudProvider]:
     # Create GPU clusters
     aws_clusters = [
         GPUCluster(
+            cluster_id="aws-gb200-cluster-1",
+            gpu_spec=gb200_spec,
+            gpu_count=500, # These are deployed in racks
+            utilization_rate=0.90,
+            rental_price_per_gpu_hour=10.50 # Premium for new tech
+        ),
+        GPUCluster(
             cluster_id="aws-h100-cluster-1",
             gpu_spec=h100_spec,
-            gpu_count=1000,
+            gpu_count=2000,
             utilization_rate=0.85,
-            rental_price_per_gpu_hour=4.50
+            rental_price_per_gpu_hour=4.10 # slight price adjustment
         ),
         GPUCluster(
             cluster_id="aws-a100-cluster-1",
             gpu_spec=a100_spec,
-            gpu_count=2000,
+            gpu_count=3000,
             utilization_rate=0.78,
-            rental_price_per_gpu_hour=2.00
+            rental_price_per_gpu_hour=1.80
         )
     ]
     
     azure_clusters = [
         GPUCluster(
-            cluster_id="azure-h100-cluster-1",
-            gpu_spec=h100_spec,
-            gpu_count=800,
-            utilization_rate=0.82,
-            rental_price_per_gpu_hour=4.20
+            cluster_id="azure-gb200-cluster-1",
+            gpu_spec=gb200_spec,
+            gpu_count=400,
+            utilization_rate=0.88,
+            rental_price_per_gpu_hour=10.20
         ),
         GPUCluster(
-            cluster_id="azure-a100-cluster-1",
-            gpu_spec=a100_spec,
+            cluster_id="azure-b100-cluster-1",
+            gpu_spec=b100_spec,
+            gpu_count=1000,
+            utilization_rate=0.85,
+            rental_price_per_gpu_hour=5.50
+        ),
+        GPUCluster(
+            cluster_id="azure-h100-cluster-1",
+            gpu_spec=h100_spec,
             gpu_count=1500,
-            utilization_rate=0.75,
-            rental_price_per_gpu_hour=1.90
+            utilization_rate=0.82,
+            rental_price_per_gpu_hour=4.00
         )
     ]
     
     gcp_clusters = [
         GPUCluster(
-            cluster_id="gcp-h100-cluster-1",
-            gpu_spec=h100_spec,
-            gpu_count=1200,
-            utilization_rate=0.88,
-            rental_price_per_gpu_hour=4.00
+            cluster_id="gcp-b100-cluster-1",
+            gpu_spec=b100_spec,
+            gpu_count=1500,
+            utilization_rate=0.92,
+            rental_price_per_gpu_hour=5.80
         ),
         GPUCluster(
-            cluster_id="gcp-v100-cluster-1",
-            gpu_spec=v100_spec,
-            gpu_count=3000,
-            utilization_rate=0.70,
-            rental_price_per_gpu_hour=1.20
+            cluster_id="gcp-h100-cluster-1",
+            gpu_spec=h100_spec,
+            gpu_count=2500,
+            utilization_rate=0.88,
+            rental_price_per_gpu_hour=3.90
+        ),
+        GPUCluster(
+            cluster_id="gcp-a100-cluster-1",
+            gpu_spec=a100_spec,
+            gpu_count=4000,
+            utilization_rate=0.80,
+            rental_price_per_gpu_hour=1.75
         )
     ]
     
@@ -131,13 +168,22 @@ def create_sample_inference_providers() -> List[InferenceProvider]:
     """Create sample inference providers with realistic data."""
     
     # Model specifications
-    gpt4_spec = ModelSpec(
-        name="GPT-4",
+    gpt5_spec = ModelSpec(
+        name="GPT-5",
         size=ModelSize.XLARGE,
+        parameters_billions=1800, # Trillion-parameter model
+        tokens_per_second_per_gpu=150, # Higher throughput on new hardware
+        memory_gb_required=300,
+        context_length=128000
+    )
+
+    gpt4_spec = ModelSpec(
+        name="GPT-4 Turbo",
+        size=ModelSize.LARGE,
         parameters_billions=175,
-        tokens_per_second_per_gpu=50,
-        memory_gb_required=40,
-        context_length=8192
+        tokens_per_second_per_gpu=80,
+        memory_gb_required=60,
+        context_length=128000
     )
     
     claude_spec = ModelSpec(
@@ -161,20 +207,33 @@ def create_sample_inference_providers() -> List[InferenceProvider]:
     # OpenAI-like provider
     openai_compute_units = [
         ComputeUnit(
-            unit_id="openai-gpt4-cluster",
-            gpu_count=500,
-            gpu_type="H100",
+            unit_id="openai-gpt5-gb200-cluster",
+            gpu_count=1000,
+            gpu_type="GB200",
+            model_spec=gpt5_spec,
+            utilization_rate=0.95,
+            hourly_gpu_cost=10.00
+        ),
+        ComputeUnit(
+            unit_id="openai-gpt4-b100-cluster",
+            gpu_count=2000,
+            gpu_type="B100",
             model_spec=gpt4_spec,
             utilization_rate=0.92,
-            hourly_gpu_cost=4.25
+            hourly_gpu_cost=5.25
         )
     ]
     
     openai_pricing = [
         TokenPricing(
-            input_tokens_per_dollar=33333,  # $0.03 per 1K tokens
-            output_tokens_per_dollar=16667,  # $0.06 per 1K tokens
+            input_tokens_per_dollar=100000,  # $0.01 per 1K tokens for GPT-4 Turbo
+            output_tokens_per_dollar=33333,   # $0.03 per 1K tokens
             model_spec=gpt4_spec
+        ),
+        TokenPricing(
+            input_tokens_per_dollar=50000, # $0.02 per 1K for GPT-5
+            output_tokens_per_dollar=16667, # $0.06 per 1K
+            model_spec=gpt5_spec
         )
     ]
     
@@ -189,12 +248,12 @@ def create_sample_inference_providers() -> List[InferenceProvider]:
     # Anthropic-like provider
     anthropic_compute_units = [
         ComputeUnit(
-            unit_id="anthropic-claude-cluster",
-            gpu_count=300,
-            gpu_type="H100",
+            unit_id="anthropic-claude-b100-cluster",
+            gpu_count=800,
+            gpu_type="B100",
             model_spec=claude_spec,
-            utilization_rate=0.88,
-            hourly_gpu_cost=4.00
+            utilization_rate=0.90,
+            hourly_gpu_cost=5.00
         )
     ]
     
@@ -217,12 +276,12 @@ def create_sample_inference_providers() -> List[InferenceProvider]:
     # Meta-like provider (open source)
     meta_compute_units = [
         ComputeUnit(
-            unit_id="meta-llama-cluster",
-            gpu_count=400,
-            gpu_type="A100",
-            model_spec=llama_spec,
-            utilization_rate=0.85,
-            hourly_gpu_cost=1.95
+            unit_id="meta-llama3-b100-cluster",
+            gpu_count=1200,
+            gpu_type="B100",
+            model_spec=llama_spec, # Assuming Llama 3 runs on B100s
+            utilization_rate=0.88,
+            hourly_gpu_cost=5.10
         )
     ]
     

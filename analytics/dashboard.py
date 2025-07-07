@@ -29,12 +29,7 @@ def create_dashboard(neoclouds: List[NeocloudProvider],
         applications: List of applications
         market_data: Market data and benchmarks
     """
-    st.set_page_config(
-        page_title="AI Token Factory Economics Stack",
-        page_icon="🏭",
-        layout="wide",
-        initial_sidebar_state="expanded"
-    )
+
     
     # Custom CSS for better styling
     st.markdown("""
@@ -91,13 +86,13 @@ def show_executive_summary(neoclouds: List[NeocloudProvider],
     col1, col2, col3, col4 = st.columns(4)
     
     # Calculate aggregate metrics
-    total_neocloud_revenue = sum(nc.calculate_revenue() for nc in neoclouds)
-    total_inference_revenue = sum(ip.calculate_revenue() for ip in inference_providers)
-    total_app_revenue = sum(app.calculate_revenue() for app in applications)
+    total_neocloud_revenue = sum(nc.total_revenue() for nc in neoclouds)
+    total_inference_revenue = sum(ip.total_revenue() for ip in inference_providers)
+    total_app_revenue = sum(app.total_revenue() for app in applications)
     
-    avg_neocloud_margin = sum(nc.calculate_gross_margin() for nc in neoclouds) / len(neoclouds) if neoclouds else 0
-    avg_inference_margin = sum(ip.calculate_gross_margin() for ip in inference_providers) / len(inference_providers) if inference_providers else 0
-    avg_app_margin = sum(app.calculate_gross_margin() for app in applications) / len(applications) if applications else 0
+    avg_neocloud_margin = sum(nc.gross_margin() for nc in neoclouds) / len(neoclouds) if neoclouds else 0
+    avg_inference_margin = sum(ip.gross_margin() for ip in inference_providers) / len(inference_providers) if inference_providers else 0
+    avg_app_margin = sum(app.gross_margin() for app in applications) / len(applications) if applications else 0
     
     with col1:
         st.metric(
@@ -109,22 +104,22 @@ def show_executive_summary(neoclouds: List[NeocloudProvider],
     with col2:
         st.metric(
             "Avg Neocloud Margin",
-            format_percentage(avg_neocloud_margin),
-            delta=format_percentage(2.1)
+            f"{avg_neocloud_margin:.2%}",
+            delta=f"{0.021:.2%}"
         )
     
     with col3:
         st.metric(
             "Avg Inference Margin",
-            format_percentage(avg_inference_margin),
-            delta=format_percentage(-1.3)
+            f"{avg_inference_margin:.2%}",
+            delta=f"{-0.013:.2%}"
         )
     
     with col4:
         st.metric(
             "Avg Application Margin",
-            format_percentage(avg_app_margin),
-            delta=format_percentage(5.7)
+            f"{avg_app_margin:.2%}",
+            delta=f"{0.057:.2%}"
         )
     
     # Revenue flow visualization
@@ -163,7 +158,7 @@ def show_executive_summary(neoclouds: List[NeocloudProvider],
             color='Layer',
             color_discrete_sequence=['#1f77b4', '#ff7f0e', '#2ca02c']
         )
-        fig_margin.update_layout(showlegend=False)
+        fig_margin.update_layout(showlegend=False, yaxis_tickformat='.2%')
         st.plotly_chart(fig_margin, use_container_width=True)
 
 
@@ -188,17 +183,17 @@ def show_neocloud_analysis(neoclouds: List[NeocloudProvider], market_data: Dict[
     col1, col2, col3, col4 = st.columns(4)
     
     with col1:
-        st.metric("Revenue", format_currency(provider.calculate_revenue()))
+        st.metric("Revenue", format_currency(provider.total_revenue()))
     with col2:
-        st.metric("Gross Margin", format_percentage(provider.calculate_gross_margin()))
+        st.metric("Gross Margin", f"{provider.gross_margin():.2%}")
     with col3:
         st.metric("Utilization", format_percentage(provider.calculate_utilization()))
     with col4:
-        st.metric("Total GPUs", format_number(sum(cluster.total_gpus for cluster in provider.gpu_clusters)))
+        st.metric("Total GPUs", format_number(sum(cluster.gpu_count for cluster in provider.clusters)))
     
     # Cost breakdown
     st.markdown("### Cost Structure")
-    costs = provider.calculate_costs()
+    costs = provider.total_cost()
     
     cost_data = {
         'Cost Type': [item.name for item in costs.items],
@@ -216,14 +211,14 @@ def show_neocloud_analysis(neoclouds: List[NeocloudProvider], market_data: Dict[
     st.markdown("### GPU Clusters")
     
     cluster_data = []
-    for cluster in provider.gpu_clusters:
+    for cluster in provider.clusters:
         cluster_data.append({
-            'Cluster Name': cluster.name,
+            'Cluster Name': cluster.cluster_id,
             'GPU Model': cluster.gpu_spec.model,
-            'Total GPUs': cluster.total_gpus,
+            'Total GPUs': cluster.gpu_count,
             'Memory per GPU': f"{cluster.gpu_spec.memory_gb}GB",
-            'Utilization': f"{cluster.utilization_rate:.1f}%",
-            'Power (kW)': cluster.total_power_kw
+            'Utilization': f"{cluster.utilization_rate*100:.1f}%",
+            'Power (kW)': cluster.total_power_consumption_kw
         })
     
     df_clusters = pd.DataFrame(cluster_data)
@@ -251,11 +246,11 @@ def show_inference_analysis(inference_providers: List[InferenceProvider], market
     col1, col2, col3, col4 = st.columns(4)
     
     with col1:
-        st.metric("Revenue", format_currency(provider.calculate_revenue()))
+        st.metric("Revenue", format_currency(provider.total_revenue()))
     with col2:
-        st.metric("Gross Margin", format_percentage(provider.calculate_gross_margin()))
+        st.metric("Gross Margin", f"{provider.gross_margin():.2%}")
     with col3:
-        st.metric("Tokens/Month", format_number(provider.usage_metrics.tokens_per_month))
+        st.metric("Tokens/Month", format_number(provider.usage_metrics.monthly_input_tokens + provider.usage_metrics.monthly_output_tokens))
     with col4:
         st.metric("Avg Response Time", f"{provider.usage_metrics.avg_response_time_ms}ms")
     
@@ -319,13 +314,13 @@ def show_application_analysis(applications: List[Application], market_data: Dict
     col1, col2, col3, col4 = st.columns(4)
     
     with col1:
-        st.metric("Revenue", format_currency(app.calculate_revenue()))
+        st.metric("Revenue", format_currency(app.total_revenue()))
     with col2:
-        st.metric("Gross Margin", format_percentage(app.calculate_gross_margin()))
+        st.metric("Gross Margin", f"{app.gross_margin():.2%}")
     with col3:
         st.metric("Monthly Users", format_number(app.user_metrics.monthly_active_users))
     with col4:
-        st.metric("Revenue per User", format_currency(app.user_metrics.average_revenue_per_user))
+        st.metric("Revenue per User", format_currency(app.total_revenue() / app.user_metrics.monthly_active_users if app.user_metrics.monthly_active_users > 0 else 0))
     
     # User segments
     st.markdown("### User Segments")
@@ -335,8 +330,8 @@ def show_application_analysis(applications: List[Application], market_data: Dict
         segment_data.append({
             'Segment': segment.name,
             'Users': segment.user_count,
-            'Monthly Revenue': segment.monthly_revenue_per_user,
-            'Token Usage': segment.monthly_token_usage,
+            'Monthly Revenue': segment.avg_monthly_revenue_per_user,
+            'Token Usage': segment.avg_tokens_per_user_per_month,
             'Churn Rate': f"{segment.churn_rate:.1f}%"
         })
     
@@ -384,27 +379,27 @@ def show_full_stack_analysis(neoclouds: List[NeocloudProvider],
     with col1:
         st.markdown("#### Neoclouds")
         for nc in neoclouds[:3]:  # Show top 3
-            efficiency = nc.calculate_efficiency()
-            st.metric(nc.name, f"{efficiency:.2f}")
+            efficiency = nc.gross_margin()
+            st.metric(nc.name, f"{efficiency:.2%}")
     
     with col2:
         st.markdown("#### Inference Providers")
         for ip in inference_providers[:3]:  # Show top 3
-            efficiency = ip.calculate_efficiency()
-            st.metric(ip.name, f"{efficiency:.2f}")
+            efficiency = ip.gross_margin()
+            st.metric(ip.name, f"{efficiency:.2%}")
     
     with col3:
         st.markdown("#### Applications")
         for app in applications[:3]:  # Show top 3
-            efficiency = app.calculate_efficiency()
-            st.metric(app.name, f"{efficiency:.2f}")
+            efficiency = app.gross_margin()
+            st.metric(app.name, f"{efficiency:.2%}")
     
     # Optimization recommendations
     st.markdown("### Optimization Recommendations")
     
     # Generate recommendations for each layer
     all_layers = neoclouds + inference_providers + applications
-    recommendations = analyzer.generate_optimization_recommendations(all_layers, market_data)
+    recommendations = analyzer._generate_layer_recommendations(all_layers)
     
     for rec in recommendations[:5]:  # Show top 5 recommendations
         with st.expander(f"🎯 {rec.title} (Priority: {rec.priority})"):
@@ -469,9 +464,9 @@ def create_revenue_flow_chart(neoclouds: List[NeocloudProvider],
                              applications: List[Application]) -> go.Figure:
     """Create revenue flow Sankey diagram."""
     # Calculate revenues
-    neocloud_revenue = sum(nc.calculate_revenue() for nc in neoclouds)
-    inference_revenue = sum(ip.calculate_revenue() for ip in inference_providers)
-    app_revenue = sum(app.calculate_revenue() for app in applications)
+    neocloud_revenue = sum(nc.total_revenue() for nc in neoclouds)
+    inference_revenue = sum(ip.total_revenue() for ip in inference_providers)
+    app_revenue = sum(app.total_revenue() for app in applications)
     
     # Create Sankey diagram
     fig = go.Figure(data=[go.Sankey(
@@ -510,9 +505,9 @@ def create_value_flow_chart(neoclouds: List[NeocloudProvider],
     )
     
     # Calculate average efficiency for each layer
-    avg_neocloud_eff = sum(nc.calculate_efficiency() for nc in neoclouds) / len(neoclouds) if neoclouds else 0
-    avg_inference_eff = sum(ip.calculate_efficiency() for ip in inference_providers) / len(inference_providers) if inference_providers else 0
-    avg_app_eff = sum(app.calculate_efficiency() for app in applications) / len(applications) if applications else 0
+    avg_neocloud_eff = sum(nc.gross_margin() for nc in neoclouds) / len(neoclouds) if neoclouds else 0
+    avg_inference_eff = sum(ip.gross_margin() for ip in inference_providers) / len(inference_providers) if inference_providers else 0
+    avg_app_eff = sum(app.gross_margin() for app in applications) / len(applications) if applications else 0
     
     # Add efficiency gauges
     fig.add_trace(

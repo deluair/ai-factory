@@ -107,13 +107,20 @@ class EconomicLayer(ABC):
         self.cost_structure = cost_structure
         self.revenue_model = revenue_model
     
-    @property
+    def total_revenue(self) -> float:
+        """Calculate total monthly revenue."""
+        return self.revenue_model.total_revenue()
+
+    def total_cost(self) -> float:
+        """Calculate total monthly cost."""
+        return self.cost_structure.total_cost()
+
     def gross_margin(self) -> float:
         """Calculate gross margin percentage."""
-        revenue = self.revenue_model.total_revenue()
+        revenue = self.total_revenue()
         if revenue == 0:
             return 0
-        return ((revenue - self.cost_structure.total_cost()) / revenue) * 100
+        return (revenue - self.total_cost()) / revenue
     
     @property
     def profit(self) -> float:

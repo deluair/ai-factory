@@ -45,6 +45,9 @@ class ProductivityMetrics:
     daily_active_users_pct: float  # 0.0 to 1.0
 
 
+
+
+
 @dataclass
 class UserMetrics:
     """User engagement and behavior metrics."""
@@ -64,6 +67,14 @@ class TokenUsagePattern:
     peak_usage_multiplier: float  # Peak vs average usage
     token_cost_per_1000: float  # Cost from inference provider
 
+
+@dataclass
+class TokenUsagePattern:
+    """Token usage patterns for the application."""
+    avg_tokens_per_request: int
+    requests_per_user_per_day: int
+    peak_usage_multiplier: float  # Peak vs average usage
+    token_cost_per_1000: float  # Cost from inference provider
 
 class Application(EconomicLayer):
     """Application layer economic model."""

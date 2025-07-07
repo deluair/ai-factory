@@ -9,9 +9,9 @@ from pathlib import Path
 sys.path.append(str(Path(__file__).parent))
 
 from data.simulation_data import (
-    generate_neocloud_data,
-    generate_inference_data, 
-    generate_application_data,
+    create_sample_neoclouds,
+    create_sample_inference_providers,
+    create_sample_applications,
     load_market_data
 )
 from analytics.dashboard import create_dashboard
@@ -21,14 +21,15 @@ def main():
     st.set_page_config(
         page_title="AI Token Factory Economics Stack",
         page_icon="🏭",
-        layout="wide"
+        layout="wide",
+        initial_sidebar_state="expanded"
     )
     
     # Load simulation data
     with st.spinner("Loading simulation data..."):
-        neoclouds = generate_neocloud_data()
-        inference_providers = generate_inference_data()
-        applications = generate_application_data()
+        neoclouds = create_sample_neoclouds()
+        inference_providers = create_sample_inference_providers()
+        applications = create_sample_applications()
         market_data = load_market_data()
     
     # Create dashboard

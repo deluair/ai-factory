@@ -69,8 +69,8 @@ class ReportGenerator:
             },
             'stack_analysis': self._analyze_full_stack(neoclouds, inference_providers, applications),
             'market_position': analyzer.calculate_market_position(neoclouds + inference_providers + applications, market_data),
-            'recommendations': [asdict(rec) for rec in analyzer.generate_optimization_recommendations(
-                neoclouds + inference_providers + applications, market_data
+            'recommendations': [asdict(rec) for rec in analyzer._generate_layer_recommendations(
+                neoclouds + inference_providers + applications
             )[:10]],
             'trends': self._analyze_trends(neoclouds, inference_providers, applications)
         }
@@ -107,7 +107,7 @@ class ReportGenerator:
             'overview': self._analyze_layer(layer_data, layer_name),
             'detailed_analysis': self._generate_detailed_layer_analysis(layer_data),
             'benchmarks': analyzer.analyze_layer_performance(layer_data, market_data),
-            'optimization': [asdict(rec) for rec in analyzer.generate_optimization_recommendations(layer_data, market_data)],
+            'optimization': [asdict(rec) for rec in analyzer._generate_layer_recommendations(layer_data)],
             'charts': self._generate_layer_charts(layer_data, layer_name)
         }
         
@@ -141,21 +141,22 @@ class ReportGenerator:
                                       (inference_providers, 'Inference'), 
                                       (applications, 'Application')]:
             for item in layer_list:
-                costs = item.calculate_costs()
-                revenue = item.calculate_revenue()
+                total_costs = item.total_cost()
+                revenue = item.total_revenue()
+                cost_structure = item.cost_structure
                 
                 financial_data.append({
                     'Layer': layer_type,
                     'Provider/App': item.name,
                     'Revenue': revenue,
-                    'Total_Costs': costs.total_cost,
-                    'Gross_Margin_Pct': item.calculate_gross_margin(),
-                    'Profit': item.calculate_profit(),
-                    'Efficiency': item.calculate_efficiency(),
+                    'Total_Costs': total_costs,
+                    'Gross_Margin_Pct': item.gross_margin(),
+                    'Profit': item.profit(),
+                    'Efficiency': item.efficiency_ratio(),
                     'Utilization_Pct': item.calculate_utilization(),
-                    'Fixed_Costs': sum(cost.amount for cost in costs.items if cost.cost_type.value == 'fixed'),
-                    'Variable_Costs': sum(cost.amount for cost in costs.items if cost.cost_type.value == 'variable'),
-                    'Operational_Costs': sum(cost.amount for cost in costs.items if cost.cost_type.value == 'operational')
+                    'Fixed_Costs': sum(cost.amount for cost in cost_structure.costs if cost.cost_type.value == 'fixed'),
+                    'Variable_Costs': sum(cost.amount for cost in cost_structure.costs if cost.cost_type.value == 'variable'),
+                    'Operational_Costs': sum(cost.amount for cost in cost_structure.costs if cost.cost_type.value == 'operational')
                 })
         
         df = pd.DataFrame(financial_data)
@@ -218,15 +219,15 @@ class ReportGenerator:
                                   applications: List[Application]) -> Dict[str, Any]:
         """Generate executive summary data."""
         total_revenue = (
-            sum(nc.calculate_revenue() for nc in neoclouds) +
-            sum(ip.calculate_revenue() for ip in inference_providers) +
-            sum(app.calculate_revenue() for app in applications)
+            sum(nc.total_revenue() for nc in neoclouds) +
+            sum(ip.total_revenue() for ip in inference_providers) +
+            sum(app.total_revenue() for app in applications)
         )
         
         total_costs = (
-            sum(nc.calculate_costs().total_cost for nc in neoclouds) +
-            sum(ip.calculate_costs().total_cost for ip in inference_providers) +
-            sum(app.calculate_costs().total_cost for app in applications)
+            sum(nc.total_cost() for nc in neoclouds) +
+            sum(ip.total_cost() for ip in inference_providers) +
+            sum(app.total_cost() for app in applications)
         )
         
         return {
@@ -242,7 +243,7 @@ class ReportGenerator:
             'top_performers': {
                 'highest_revenue': self._find_top_performer(neoclouds + inference_providers + applications, 'revenue'),
                 'highest_margin': self._find_top_performer(neoclouds + inference_providers + applications, 'margin'),
-                'highest_efficiency': self._find_top_performer(neoclouds + inference_providers + applications, 'efficiency')
+                'highest_efficiency': self._find_top_performer(neoclouds + inference_providers + applications, 'efficiency_ratio')
             }
         }
     
@@ -251,9 +252,9 @@ class ReportGenerator:
         if not layer_data:
             return {'error': f'No data available for {layer_name}'}
         
-        revenues = [item.calculate_revenue() for item in layer_data]
-        margins = [item.calculate_gross_margin() for item in layer_data]
-        efficiencies = [item.calculate_efficiency() for item in layer_data]
+        revenues = [item.total_revenue() for item in layer_data]
+        margins = [item.gross_margin() for item in layer_data]
+        efficiencies = [item.efficiency_ratio() for item in layer_data]
         utilizations = [item.calculate_utilization() for item in layer_data]
         
         return {
@@ -265,8 +266,8 @@ class ReportGenerator:
             'average_utilization': sum(utilizations) / len(utilizations),
             'revenue_range': {'min': min(revenues), 'max': max(revenues)},
             'margin_range': {'min': min(margins), 'max': max(margins)},
-            'top_performer': max(layer_data, key=lambda x: x.calculate_revenue()).name,
-            'most_efficient': max(layer_data, key=lambda x: x.calculate_efficiency()).name
+            'top_performer': max(layer_data, key=lambda x: x.total_revenue()).name,
+            'most_efficient': max(layer_data, key=lambda x: x.efficiency_ratio()).name
         }
     
     def _analyze_full_stack(self,
@@ -280,18 +281,18 @@ class ReportGenerator:
             return {'error': 'No data available for stack analysis'}
         
         # Calculate value flow
-        neocloud_revenue = sum(nc.calculate_revenue() for nc in neoclouds)
-        inference_revenue = sum(ip.calculate_revenue() for ip in inference_providers)
-        app_revenue = sum(app.calculate_revenue() for app in applications)
+        neocloud_revenue = sum(nc.total_revenue() for nc in neoclouds)
+        inference_revenue = sum(ip.total_revenue() for ip in inference_providers)
+        app_revenue = sum(app.total_revenue() for app in applications)
         
         # Calculate efficiency multipliers
         stack_efficiency = 1.0
         if neoclouds:
-            stack_efficiency *= sum(nc.calculate_efficiency() for nc in neoclouds) / len(neoclouds)
+            stack_efficiency *= sum(nc.efficiency_ratio() for nc in neoclouds) / len(neoclouds)
         if inference_providers:
-            stack_efficiency *= sum(ip.calculate_efficiency() for ip in inference_providers) / len(inference_providers)
+            stack_efficiency *= sum(ip.efficiency_ratio() for ip in inference_providers) / len(inference_providers)
         if applications:
-            stack_efficiency *= sum(app.calculate_efficiency() for app in applications) / len(applications)
+            stack_efficiency *= sum(app.efficiency_ratio() for app in applications) / len(applications)
         
         return {
             'value_flow': {
@@ -334,15 +335,15 @@ class ReportGenerator:
         detailed_analysis = []
         
         for item in layer_data:
-            costs = item.calculate_costs()
+            costs = item.total_cost()
             
             analysis = {
                 'name': item.name,
-                'revenue': item.calculate_revenue(),
-                'costs': costs.total_cost,
-                'profit': item.calculate_profit(),
-                'margin': item.calculate_gross_margin(),
-                'efficiency': item.calculate_efficiency(),
+                'revenue': item.total_revenue(),
+                'costs': costs,
+                'profit': item.profit(),
+                'margin': item.gross_margin(),
+                'efficiency': item.efficiency_ratio(),
                 'utilization': item.calculate_utilization(),
                 'cost_breakdown': {
                     cost_item.name: cost_item.amount for cost_item in costs.items
@@ -362,7 +363,7 @@ class ReportGenerator:
             return charts
         
         # Revenue distribution chart
-        revenues = [item.calculate_revenue() for item in layer_data]
+        revenues = [item.total_revenue() for item in layer_data]
         names = [item.name for item in layer_data]
         
         plt.figure(figsize=(10, 6))
@@ -388,9 +389,9 @@ class ReportGenerator:
         """Create revenue comparison chart."""
         layers = ['Neoclouds', 'Inference Providers', 'Applications']
         revenues = [
-            sum(nc.calculate_revenue() for nc in neoclouds),
-            sum(ip.calculate_revenue() for ip in inference_providers),
-            sum(app.calculate_revenue() for app in applications)
+            sum(nc.total_revenue() for nc in neoclouds),
+            sum(ip.total_revenue() for ip in inference_providers),
+            sum(app.total_revenue() for app in applications)
         ]
         
         plt.figure(figsize=(10, 6))
@@ -419,7 +420,7 @@ class ReportGenerator:
         """Create margin analysis chart."""
         all_items = neoclouds + inference_providers + applications
         names = [item.name for item in all_items]
-        margins = [item.calculate_gross_margin() for item in all_items]
+        margins = [item.gross_margin() for item in all_items]
         colors = (['#1f77b4'] * len(neoclouds) + 
                  ['#ff7f0e'] * len(inference_providers) + 
                  ['#2ca02c'] * len(applications))
@@ -446,7 +447,7 @@ class ReportGenerator:
                                             applications: List[Application]) -> Path:
         """Create efficiency distribution chart."""
         all_items = neoclouds + inference_providers + applications
-        efficiencies = [item.calculate_efficiency() for item in all_items]
+        efficiencies = [item.efficiency_ratio() for item in all_items]
         
         plt.figure(figsize=(10, 6))
         plt.hist(efficiencies, bins=20, alpha=0.7, color='skyblue', edgecolor='black')
@@ -472,7 +473,7 @@ class ReportGenerator:
         
         for layer in [neoclouds, inference_providers, applications]:
             for item in layer:
-                costs = item.calculate_costs()
+                costs = item.total_cost()
                 for cost_item in costs.items:
                     if cost_item.cost_type.value == 'fixed':
                         cost_categories['Fixed'] += cost_item.amount
@@ -577,14 +578,14 @@ class ReportGenerator:
             return {'name': 'N/A', 'value': 0}
         
         if metric == 'revenue':
-            top_item = max(items, key=lambda x: x.calculate_revenue())
-            return {'name': top_item.name, 'value': top_item.calculate_revenue()}
+            top_item = max(items, key=lambda x: x.total_revenue())
+            return {'name': top_item.name, 'value': top_item.total_revenue()}
         elif metric == 'margin':
-            top_item = max(items, key=lambda x: x.calculate_gross_margin())
-            return {'name': top_item.name, 'value': top_item.calculate_gross_margin()}
-        elif metric == 'efficiency':
-            top_item = max(items, key=lambda x: x.calculate_efficiency())
-            return {'name': top_item.name, 'value': top_item.calculate_efficiency()}
+            top_item = max(items, key=lambda x: x.gross_margin())
+            return {'name': top_item.name, 'value': top_item.gross_margin()}
+        elif metric == 'efficiency_ratio':
+            top_item = max(items, key=lambda x: x.efficiency_ratio())
+            return {'name': top_item.name, 'value': top_item.efficiency_ratio()}
         else:
             return {'name': 'N/A', 'value': 0}
     
@@ -609,13 +610,13 @@ class ReportGenerator:
         # Check efficiency scores
         all_items = neoclouds + inference_providers + applications
         for item in all_items:
-            if item.calculate_efficiency() < 0.8:
+            if item.efficiency_ratio() < 0.8:
                 layer_type = 'Neocloud' if item in neoclouds else 'Inference' if item in inference_providers else 'Application'
                 bottlenecks.append({
                     'type': 'Low Efficiency',
                     'layer': layer_type,
                     'item': item.name,
-                    'value': item.calculate_efficiency(),
+                    'value': item.efficiency_ratio(),
                     'impact': 'Medium'
                 })
         
@@ -626,10 +627,10 @@ class ReportGenerator:
         if not items:
             return {'revenue_potential': 0, 'cost_reduction_potential': 0, 'efficiency_gain_potential': 0}
         
-        current_efficiency = sum(item.calculate_efficiency() for item in items) / len(items)
+        current_efficiency = sum(item.efficiency_ratio() for item in items) / len(items)
         target_efficiency = 1.2  # 20% above baseline
         
-        current_revenue = sum(item.calculate_revenue() for item in items)
+        current_revenue = sum(item.total_revenue() for item in items)
         potential_revenue_gain = current_revenue * (target_efficiency - current_efficiency)
         
         return {
@@ -641,8 +642,8 @@ class ReportGenerator:
     def _calculate_optimization_score(self, item: EconomicLayer) -> float:
         """Calculate optimization score for an item."""
         # Weighted score based on multiple factors
-        margin_score = min(item.calculate_gross_margin() / 30, 1.0)  # Target 30% margin
-        efficiency_score = min(item.calculate_efficiency() / 1.5, 1.0)  # Target 1.5 efficiency
+        margin_score = min(item.gross_margin() / 30, 1.0)  # Target 30% margin
+        efficiency_score = min(item.efficiency_ratio() / 1.5, 1.0)  # Target 1.5 efficiency
         utilization_score = min(item.calculate_utilization() / 85, 1.0)  # Target 85% utilization
         
         return (margin_score * 0.4 + efficiency_score * 0.4 + utilization_score * 0.2) * 100
